@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vanilla Particle Playground</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: radial-gradient(circle at top left, #0f2027, #203a43 45%, #2c5364);
+        font-family: "Pretendard", "Noto Sans KR", system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+      }
+
+      canvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+      }
+
+      .hint {
+        position: fixed;
+        bottom: 1.5rem;
+        right: 1.5rem;
+        padding: 0.6rem 1rem;
+        background: rgba(18, 32, 43, 0.75);
+        color: rgba(255, 255, 255, 0.8);
+        border-radius: 999px;
+        font-size: 0.85rem;
+        letter-spacing: 0.04em;
+        backdrop-filter: blur(6px);
+        user-select: none;
+        pointer-events: none;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+        transition: opacity 0.4s ease;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="playground"></canvas>
+    <div class="hint">마우스를 움직여 파티클과 놀아보세요 ✨</div>
+    <script>
+      const canvas = document.getElementById("playground");
+      const ctx = canvas.getContext("2d");
+      const DPR = window.devicePixelRatio || 1;
+      const PARTICLE_COUNT = 140;
+      const BASE_SPEED = 0.45;
+      const MAX_SPEED = 1.8;
+      const INFLUENCE_RADIUS = 160;
+      let width = window.innerWidth;
+      let height = window.innerHeight;
+
+      const mouse = { x: 0, y: 0, active: false };
+      const particles = [];
+
+      const palette = Array.from({ length: PARTICLE_COUNT }, (_, i) =>
+        `hsla(${Math.round((360 / PARTICLE_COUNT) * i)}, 80%, 60%, 0.9)`
+      );
+
+      function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width * DPR;
+        canvas.height = height * DPR;
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      }
+
+      function createParticle(index) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = BASE_SPEED + Math.random() * BASE_SPEED;
+        return {
+          x: Math.random() * width,
+          y: Math.random() * height,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          radius: 1.5 + Math.random() * 2.6,
+          color: palette[index % palette.length],
+        };
+      }
+
+      function resetParticles() {
+        particles.length = 0;
+        for (let i = 0; i < PARTICLE_COUNT; i += 1) {
+          particles.push(createParticle(i));
+        }
+      }
+
+      function update() {
+        for (const particle of particles) {
+          particle.x += particle.vx;
+          particle.y += particle.vy;
+
+          if (mouse.active) {
+            const dx = mouse.x - particle.x;
+            const dy = mouse.y - particle.y;
+            const distance = Math.hypot(dx, dy) || 1;
+            if (distance < INFLUENCE_RADIUS) {
+              const force = (INFLUENCE_RADIUS - distance) / INFLUENCE_RADIUS;
+              const strength = force * 0.08;
+              particle.vx += (dx / distance) * strength;
+              particle.vy += (dy / distance) * strength;
+            }
+          }
+
+          particle.vx *= 0.995;
+          particle.vy *= 0.995;
+
+          const speed = Math.hypot(particle.vx, particle.vy);
+          if (speed > MAX_SPEED) {
+            const factor = MAX_SPEED / speed;
+            particle.vx *= factor;
+            particle.vy *= factor;
+          }
+
+          if (particle.x < -particle.radius) particle.x = width + particle.radius;
+          if (particle.x > width + particle.radius) particle.x = -particle.radius;
+          if (particle.y < -particle.radius) particle.y = height + particle.radius;
+          if (particle.y > height + particle.radius) particle.y = -particle.radius;
+        }
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, width, height);
+        ctx.globalCompositeOperation = "lighter";
+        for (const particle of particles) {
+          ctx.beginPath();
+          const gradient = ctx.createRadialGradient(
+            particle.x,
+            particle.y,
+            0,
+            particle.x,
+            particle.y,
+            particle.radius * 3
+          );
+          gradient.addColorStop(0, particle.color);
+          gradient.addColorStop(1, "rgba(15, 32, 39, 0)");
+          ctx.fillStyle = gradient;
+          ctx.arc(particle.x, particle.y, particle.radius * 2.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalCompositeOperation = "source-over";
+      }
+
+      function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+      }
+
+      canvas.addEventListener("pointermove", (event) => {
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = event.clientX - rect.left;
+        mouse.y = event.clientY - rect.top;
+        mouse.active = true;
+      });
+
+      canvas.addEventListener("pointerleave", () => {
+        mouse.active = false;
+      });
+
+      window.addEventListener("resize", () => {
+        resize();
+        resetParticles();
+      });
+
+      resize();
+      resetParticles();
+      loop();
+    </script>
+  </body>
+</html>
